@@ -1,0 +1,30 @@
+@import './base.css';
+
+header {
+  text-align: center;
+  padding: 1.5rem 0;
+}
+
+nav {
+  display: flex;
+  justify-content: center;
+  gap: 1.5rem;
+  margin-top: 1rem;
+  font-size: 20px;
+}
+
+nav a {
+  text-decoration: none;
+  color: #333;
+}
+
+nav a.router-link-exact-active {
+  font-weight: bold;
+  text-decoration: underline;
+}
+
+/* Conteneur du RouterView */
+#affichage {
+  margin-left: 10%;
+  padding: 2rem;
+}
