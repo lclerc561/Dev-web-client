@@ -1,11 +1,11 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { useAuthStore } from '@/stores/auth' // On importe le store pour vérifier la clé
-
-// Importation simple de vos vues
+import { useAuthStore } from '@/stores/auth'
 import Connexion from '../views/Connexion.vue'
 import Activite from '../views/Activite.vue'
 import Profil from '../views/Profil.vue'
 import Projet from '../views/Projet.vue'
+import Statistiques from '../views/Statistiques.vue'
+import ActivitesConfig from '../views/ActivitesConfig.vue' 
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -33,6 +33,16 @@ const router = createRouter({
       path: '/projets',
       name: 'projet',
       component: Projet
+    },
+    {
+      path: '/statistiques',
+      name: 'statistiques',
+      component: Statistiques
+    },
+    {
+      path: '/config-activites',
+      name: 'config-activites',
+      component: ActivitesConfig
     }
   ]
 })

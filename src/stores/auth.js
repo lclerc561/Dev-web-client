@@ -7,7 +7,6 @@ export const useAuthStore = defineStore('auth', {
         user: null
     }),
 
-    // ACTIONS : Les méthodes pour modifier le state
     actions: {
         setApiKey(key) {
             this.apiKey = key
