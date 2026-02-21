@@ -7,11 +7,44 @@ const typesActivites = ref([])
 const historique = ref([])
 const enCours = ref(null)
 const timerDisplay = ref('00:00:00')
+const objectifs = ref([])
+const nouvelObjectif = ref({ name: '', content: '' })
+const form = ref({ project_id: '', activity_id: '', comment: '' })
+const nouveauType = ref({ name: '', color: '#42b983' })
 let intervalId = null
 
-const form = ref({ project_id: '', activity_id: '', comment: '' })
 
-const nouveauType = ref({ name: '', color: '#42b983' })
+async function chargerObjectifs() {
+  try {
+    const aujourdhui = new Date().toISOString().split('T')[0]
+    const res = await axios.get(`/daily-objectives?date=${aujourdhui}`)
+    objectifs.value = res.data
+  } catch (e) {
+    console.error("Erreur objectifs", e)
+  }
+}
+
+async function ajouterObjectif() {
+  if (!nouvelObjectif.value.name) return alert("Le nom est obligatoire")
+  try {
+    await axios.post('/daily-objectives', nouvelObjectif.value)
+    nouvelObjectif.value = { name: '', content: '' }
+    await chargerObjectifs()
+  } catch (e) {
+    alert("Erreur lors de la création de l'objectif")
+  }
+}
+
+async function cocherObjectif(id, estFait) {
+  try {
+    const route = estFait ? 'done' : 'undone'
+    await axios.patch(`/daily-objectives/${id}/${route}`)
+    await chargerObjectifs()
+  } catch (e) {
+    alert("Erreur de mise à jour")
+  }
+}
+
 
 async function init() {
   try {
@@ -23,60 +56,64 @@ async function init() {
 
     projets.value = resProj.data
     typesActivites.value = resTypes.data
-    const allEntries = resTime.data
-    const current = allEntries.find(e => !e.end)
+
+    const current = resTime.data.find(e => !e.end)
     if (current) {
       enCours.value = current
       demarrerCompteurVisuel(current.start)
     }
-    historique.value = allEntries.filter(e => e.end).reverse()
+
+    historique.value = resTime.data.filter(e => e.end).reverse()
+    await chargerObjectifs()
   } catch (e) {
     console.error("Erreur chargement", e)
   }
 }
 
-async function creerType() {
-  if (!nouveauType.value.name) return alert("Nom obligatoire")
-  try {
-    await axios.post('/activities', nouveauType.value)
-    nouveauType.value.name = ''
-    const res = await axios.get('/activities')
-    typesActivites.value = res.data
-  } catch (e) { alert("Erreur création type") }
-}
-
 async function demarrer() {
-  if (!form.value.project_id || !form.value.activity_id) return alert("Sélectionnez Projet et Activité")
+  if (!form.value.project_id || !form.value.activity_id) {
+    return alert("Sélectionnez un Projet et une Activité");
+  }
+
+  const payload = {
+    project_id: form.value.project_id,
+    activity_id: form.value.activity_id,
+    comment: form.value.comment || null
+  };
+
+  console.log("Payload envoyé à l'API :", payload);
 
   try {
-    const res = await axios.post('/time-entries', { // 
-      project_id: form.value.project_id,
-      activity_id: form.value.activity_id,
-      comment: form.value.comment,
-      start: new Date().toISOString()
-    })
+    const res = await axios.post('/time-entries', payload);
 
-    enCours.value = res.data
-    demarrerCompteurVisuel(enCours.value.start)
-    form.value.comment = ''
-  } catch (e) { alert("Impossible de démarrer") }
+    enCours.value = res.data;
+    demarrerCompteurVisuel(enCours.value.start);
+    form.value.comment = '';
+    await init();
+  } catch (e) {
+    if (e.response && e.response.data.errors) {
+      console.table(e.response.data.errors);
+    }
+    alert("Erreur lors du démarrage. Vérifiez la console.");
+  }
 }
 
 async function stopper() {
   if (!enCours.value) return
   try {
-    await axios.patch(`/time-entries/${enCours.value.id}/stop`) // 
+    await axios.patch(`/time-entries/${enCours.value.id}/stop`)
     clearInterval(intervalId)
     enCours.value = null
     timerDisplay.value = '00:00:00'
-    init()
-  } catch (e) { alert("Erreur arrêt") }
+    await init()
+  } catch (e) {
+    alert("Erreur arrêt")
+  }
 }
 
 function demarrerCompteurVisuel(dateStart) {
   clearInterval(intervalId)
   const start = new Date(dateStart).getTime()
-
   intervalId = setInterval(() => {
     const diff = new Date().getTime() - start
     const h = Math.floor(diff / 3600000).toString().padStart(2, '0')
@@ -95,22 +132,11 @@ onUnmounted(() => clearInterval(intervalId))
 
 <template>
   <div class="dashboard">
-    <h2>Tableau de bord</h2>
-
-    <div class="quick-add-type">
-      <details>
-        <summary>Créer un nouveau type d'activité</summary>
-        <div class="add-box">
-          <input v-model="nouveauType.name" placeholder="Nom (ex: Dev, Réunion)" />
-          <input type="color" v-model="nouveauType.color" title="Couleur" />
-          <button @click="creerType">Créer</button>
-        </div>
-      </details>
-    </div>
+    <h2>Page d'activité</h2>
 
     <div class="tracker-box" :class="{ active: enCours }">
-
       <div v-if="!enCours" class="form-start">
+        <h3>Nouvelle activité</h3>
         <div class="row">
           <select v-model="form.project_id">
             <option value="" disabled>Choisir un Projet...</option>
@@ -122,7 +148,7 @@ onUnmounted(() => clearInterval(intervalId))
             <option v-for="t in typesActivites" :key="t.id" :value="t.id">{{ t.name }}</option>
           </select>
         </div>
-        <input v-model="form.comment" placeholder="Description (optionnel)" class="input-comment" />
+        <input v-model="form.comment" placeholder="Note ou commentaire (Markdown possible)" class="input-comment" />
         <button @click="demarrer" class="btn-start">▶ DÉMARRER</button>
       </div>
 
@@ -134,152 +160,74 @@ onUnmounted(() => clearInterval(intervalId))
           <strong>{{ getProjName(enCours.project_id) }}</strong>
         </div>
         <div class="digits">{{ timerDisplay }}</div>
-        <button @click="stopper" class="btn-stop">■ STOP</button>
+        <button @click="stopper" class="btn-stop">■ STOPPER</button>
+      </div>
+    </div>
+
+    <div class="objectives-section">
+      <h3>🎯 Mes objectifs du jour [cite: 106]</h3>
+
+      <div class="add-objective">
+        <input v-model="nouvelObjectif.name" placeholder="Titre de l'objectif..." />
+        <textarea v-model="nouvelObjectif.content" placeholder="Description détaillée..."></textarea>
+        <button @click="ajouterObjectif" class="btn-add-obj">Ajouter</button>
+      </div>
+
+      <div class="objectives-list">
+        <div v-if="objectifs.length === 0" class="empty">Aucun objectif aujourd'hui.</div>
+        <div v-for="obj in objectifs" :key="obj.id" class="obj-item" :class="{ 'is-done': obj.done }">
+          <input type="checkbox" :checked="obj.done" @change="cocherObjectif(obj.id, !obj.done)" />
+          <div class="obj-text">
+            <strong>{{ obj.name }}</strong>
+            <p v-if="obj.content" class="obj-desc">{{ obj.content }}</p>
+          </div>
+        </div>
       </div>
     </div>
 
     <div class="history">
-      <h3>Historique du jour</h3>
-      <div v-if="historique.length === 0" class="empty">Aucune activité terminée aujourd'hui.</div>
-      <ul v-else>
-        <li v-for="h in historique" :key="h.id" class="hist-item"
-          :style="{ borderLeftColor: getType(h.activity_id).color }">
+      <h3>Activités terminées aujourd'hui</h3>
+      <ul v-if="historique.length > 0">
+        <li v-for="h in historique" :key="h.id" class="hist-item" :style="{ borderLeftColor: getType(h.activity_id).color }">
           <div>
             <strong>{{ getProjName(h.project_id) }}</strong>
             <small> • {{ getType(h.activity_id).name }}</small>
             <div class="comment" v-if="h.comment">{{ h.comment }}</div>
           </div>
           <div class="time-range">
-            {{ new Date(h.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }} -
-            {{ new Date(h.end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }}
+            {{ new Date(h.start).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) }} -
+            {{ new Date(h.end).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) }}
           </div>
         </li>
       </ul>
+      <div v-else class="empty">Rien à afficher pour le moment.</div>
     </div>
   </div>
 </template>
 
 <style scoped>
-.dashboard {
-  max-width: 600px;
-  margin: 0 auto;
-}
+.dashboard { max-width: 700px; margin: 0 auto; padding: 20px; font-family: sans-serif; }
 
-.quick-add-type {
-  margin-bottom: 20px;
-  font-size: 0.9em;
-}
+/* Tracker Style [cite: 91] */
+.tracker-box { background: #fff; padding: 20px; border-radius: 12px; border: 1px solid #ddd; margin-bottom: 30px; }
+.tracker-box.active { border-color: #42b983; box-shadow: 0 0 15px rgba(66, 185, 131, 0.2); }
+.row { display: flex; gap: 10px; margin-bottom: 10px; }
+select, .input-comment { padding: 10px; border-radius: 6px; border: 1px solid #ccc; width: 100%; box-sizing: border-box; }
+.btn-start { width: 100%; padding: 12px; background: #42b983; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
+.btn-stop { background: #d9534f; color: white; border: none; padding: 10px 40px; border-radius: 20px; cursor: pointer; font-size: 1.1em; }
+.digits { font-size: 3.5em; font-weight: bold; font-family: monospace; margin: 15px 0; color: #2c3e50; }
 
-.add-box {
-  display: flex;
-  gap: 5px;
-  margin-top: 5px;
-  padding: 10px;
-  background: #eee;
-  border-radius: 4px;
-}
+/* Objectives Style [cite: 104] */
+.objectives-section { background: #f8f9fa; padding: 20px; border-radius: 12px; margin-bottom: 30px; }
+.add-objective { margin-bottom: 20px; }
+.add-objective input, .add-objective textarea { width: 100%; padding: 8px; margin-bottom: 8px; border: 1px solid #ddd; border-radius: 4px; display: block; }
+.btn-add-obj { background: #2c3e50; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; }
+.obj-item { display: flex; gap: 12px; background: white; padding: 12px; border-radius: 6px; margin-bottom: 8px; border: 1px solid #eee; }
+.obj-item.is-done { opacity: 0.6; text-decoration: line-through; }
+.obj-desc { font-size: 0.85em; color: #666; margin: 4px 0 0 0; }
 
-.add-box input[type="text"] {
-  flex: 1;
-  padding: 5px;
-}
-
-.tracker-box {
-  background: white;
-  padding: 20px;
-  border-radius: 8px;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-  margin-bottom: 30px;
-  border: 1px solid #ddd;
-}
-
-.tracker-box.active {
-  border-color: #42b983;
-  background: #f0fdf4;
-}
-
-.row {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 10px;
-}
-
-select {
-  flex: 1;
-  padding: 10px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-}
-
-.input-comment {
-  width: 100%;
-  padding: 10px;
-  margin-bottom: 10px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  box-sizing: border-box;
-}
-
-.btn-start {
-  width: 100%;
-  padding: 12px;
-  background: #42b983;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  font-size: 1.1em;
-  cursor: pointer;
-}
-
-.btn-stop {
-  background: #d9534f;
-  color: white;
-  padding: 10px 30px;
-  border: none;
-  border-radius: 20px;
-  font-size: 1.2em;
-  cursor: pointer;
-}
-
-.timer-display {
-  text-align: center;
-}
-
-.digits {
-  font-size: 3em;
-  font-family: monospace;
-  font-weight: bold;
-  margin: 15px 0;
-  color: #333;
-}
-
-.badge {
-  color: white;
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-size: 0.8em;
-  margin-right: 5px;
-  vertical-align: middle;
-}
-
-.hist-item {
-  background: white;
-  border-bottom: 1px solid #eee;
-  padding: 10px;
-  display: flex;
-  justify-content: space-between;
-  border-left: 4px solid #ccc;
-  margin-bottom: 5px;
-}
-
-.time-range {
-  font-weight: bold;
-  font-size: 0.9em;
-  color: #555;
-}
-
-.empty {
-  color: #777;
-  font-style: italic;
-}
+/* History Style [cite: 96] */
+.hist-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; background: white; margin-bottom: 8px; border-radius: 6px; border-left: 5px solid #ccc; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+.badge { color: white; padding: 3px 8px; border-radius: 4px; font-size: 0.75em; margin-right: 8px; }
+.empty { color: #999; font-style: italic; text-align: center; padding: 20px; }
 </style>
