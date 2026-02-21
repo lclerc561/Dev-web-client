@@ -11,6 +11,7 @@ export const useTrackerStore = defineStore('tracker', {
     actions: {
         async refreshHeaderData() {
             try {
+                // 1. Récupération des activités pour le tracker et le total d'heures
                 const resTime = await axios.get('/time-entries')
                 const entries = resTime.data
 
@@ -24,7 +25,12 @@ export const useTrackerStore = defineStore('tracker', {
                 const m = Math.floor((totalMs % 3600000) / 60000).toString().padStart(2, '0')
                 this.totalHeuresJour = `${h}h${m}`
 
-                this.objectifs = { faits: 0, total: 0 }
+                // 2. Récupération des objectifs du jour pour le ratio du Header
+                const today = new Date().toISOString().split('T')[0]
+                const resObj = await axios.get(`/daily-objectives?date=${today}`)
+
+                this.objectifs.total = resObj.data.length
+                this.objectifs.faits = resObj.data.filter(o => o.done).length
 
             } catch (e) {
                 console.error("Erreur sync tracker", e)

@@ -18,7 +18,10 @@ const stats = computed(() => {
   const actDist = {}
   let totalMs = 0
 
-  entries.value.forEach(e => {
+  // SÉCURITÉ 1 : On garantit qu'on boucle sur un vrai tableau
+  const safeEntries = Array.isArray(entries.value) ? entries.value : []
+
+  safeEntries.forEach(e => {
     if (!e.end) return
     const duration = new Date(e.end) - new Date(e.start)
     totalMs += duration
@@ -44,9 +47,18 @@ async function fetchData() {
         }
       })
     ])
+
     projets.value = resProjs.data
     activitesRef.value = resActs.data
-    entries.value = resEntries.data.data || resEntries.data  } catch (e) {
+
+    // SÉCURITÉ 2 : On extrait intelligemment le tableau, peu importe le format de la pagination
+    let rawData = resEntries.data
+    if (rawData && !Array.isArray(rawData)) {
+      rawData = rawData.data || rawData.items || []
+    }
+    entries.value = Array.isArray(rawData) ? rawData : []
+
+  } catch (e) {
     console.error("Erreur de chargement", e)
   }
 }
@@ -81,7 +93,7 @@ onMounted(fetchData)
     </div>
 
     <div class="summary">
-      <p>Temps total travaillé : <strong>{{ stats.totalH }}h</strong> [cite: 117]</p>
+      <p>Temps total travaillé : <strong>{{ stats.totalH }}h</strong></p>
     </div>
 
     <div class="charts">
