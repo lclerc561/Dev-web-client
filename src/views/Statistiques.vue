@@ -17,8 +17,6 @@ const stats = computed(() => {
   const projDist = {}
   const actDist = {}
   let totalMs = 0
-
-  // SÉCURITÉ 1 : On garantit qu'on boucle sur un vrai tableau
   const safeEntries = Array.isArray(entries.value) ? entries.value : []
 
   safeEntries.forEach(e => {
@@ -50,8 +48,6 @@ async function fetchData() {
 
     projets.value = resProjs.data
     activitesRef.value = resActs.data
-
-    // SÉCURITÉ 2 : On extrait intelligemment le tableau, peu importe le format de la pagination
     let rawData = resEntries.data
     if (rawData && !Array.isArray(rawData)) {
       rawData = rawData.data || rawData.items || []
@@ -81,7 +77,7 @@ onMounted(fetchData)
 
 <template>
   <div class="reporting">
-    <h2>📊 Reporting / Statistiques</h2>
+    <h2>Reporting / Statistiques</h2>
 
     <div class="filters">
       <input type="date" v-model="filters.from" @change="fetchData">
@@ -110,7 +106,7 @@ onMounted(fetchData)
     <div class="logs">
       <h3>Détail des entrées (Page {{ pagination.page }})</h3>
       <div v-for="e in entries" :key="e.id" class="log-row">
-        {{ e.start }} - {{ e.comment || '(Sans note)' }}
+        <strong v-format-date="e.start"></strong> - {{ e.comment || '(Sans note)' }}
       </div>
       <div class="pagination-btns">
         <button @click="pagination.page--; fetchData()" :disabled="pagination.page <= 1">Précédent</button>
@@ -121,9 +117,32 @@ onMounted(fetchData)
 </template>
 
 <style scoped>
-.filters { display: flex; gap: 10px; margin-bottom: 20px; }
-.charts { display: flex; gap: 20px; flex-wrap: wrap; }
-.chart-item { width: 300px; text-align: center; }
-.log-row { padding: 10px; border-bottom: 1px solid #eee; font-size: 0.9em; }
-.pagination-btns { margin-top: 15px; display: flex; gap: 10px; }
+.filters {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.charts {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.chart-item {
+  width: 300px;
+  text-align: center;
+}
+
+.log-row {
+  padding: 10px;
+  border-bottom: 1px solid #eee;
+  font-size: 0.9em;
+}
+
+.pagination-btns {
+  margin-top: 15px;
+  display: flex;
+  gap: 10px;
+}
 </style>

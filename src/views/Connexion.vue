@@ -46,7 +46,7 @@ function deconnexion() {
     <h2>Connexion Timely</h2>
 
     <div v-if="nouvelleCle" class="success-box">
-      <h3>🎉 Compte créé avec succès !</h3>
+      <h3>Compte créé avec succès !</h3>
       <p><strong>ATTENTION :</strong> Copiez cette clé et gardez-la précieusement. C'est votre seul moyen de vous
         reconnecter sur un autre appareil.</p>
 
